@@ -1,0 +1,15 @@
+# 排除 Python 虛擬環境
+.venv/
+venv/
+env/
+
+# 排除 Python 編譯暫存檔
+__pycache__/
+*.pyc
+
+# 排除測試工具暫存
+.pytest_cache/
+
+# 排除系統暫存檔
+.DS_Store
+Thumbs.db
