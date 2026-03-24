@@ -73,20 +73,29 @@
     <div class="card">
         <h2>Results</h2>
 
+        <p><strong>Selected mode:</strong> {{ mode }}</p>
+        <p><strong>Status:</strong> {{ status }}</p>
+        <p><strong>Count:</strong> {{ count }}</p>
+
         {% if error %}
             <p class="error">Error: {{ error }}</p>
         {% endif %}
 
-        <p><strong>Count:</strong> {{ count }}</p>
+        {% if status == "idle" %}
+            <p class="muted">No action items extracted yet.</p>
 
-        {% if items %}
+        {% elif status == "success" %}
             <ol>
                 {% for item in items %}
                     <li class="result-item">{{ item }}</li>
                 {% endfor %}
             </ol>
-        {% else %}
-            <p class="muted">No action items extracted yet.</p>
+
+        {% elif status == "no_items" %}
+            <p class="muted">The extraction ran successfully, but no action items were found.</p>
+
+        {% elif status == "error" %}
+            <p class="error">Something went wrong while extracting action items.</p>
         {% endif %}
     </div>
 </body>

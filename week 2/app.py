@@ -25,6 +25,7 @@ def home(request: Request):
             "notes": "",
             "mode": "auto",
             "count": 0,
+            "status": "idle",
             "error": "",
         },
     )
@@ -38,6 +39,12 @@ def extract_action_items_web(
 ):
     try:
         items = run_agent(notes, mode=mode)
+
+        if len(items) > 0:
+            status = "success"
+        else:
+            status = "no_items"
+
         return templates.TemplateResponse(
             "index.html",
             {
@@ -46,6 +53,7 @@ def extract_action_items_web(
                 "notes": notes,
                 "mode": mode,
                 "count": len(items),
+                "status": status,
                 "error": "",
             },
         )
@@ -58,6 +66,7 @@ def extract_action_items_web(
                 "notes": notes,
                 "mode": mode,
                 "count": 0,
+                "status": "error",
                 "error": str(e),
             },
         )
