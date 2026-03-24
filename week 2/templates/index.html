@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Action Item Extractor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            margin-bottom: 10px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 220px;
+            padding: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        select, button {
+            padding: 10px 14px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button {
+            cursor: pointer;
+        }
+        .result-item {
+            margin-bottom: 8px;
+        }
+        .muted {
+            color: #666;
+        }
+        .error {
+            color: #b00020;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Action Item Extractor</h1>
+    <p class="muted">Paste meeting notes below, choose a mode, and extract action items.</p>
+
+    <div class="card">
+        <form action="/extract" method="post">
+            <label for="notes"><strong>Meeting Notes</strong></label><br />
+            <textarea id="notes" name="notes" placeholder="Paste your notes here...">{{ notes }}</textarea>
+            <br />
+
+            <label for="mode"><strong>Mode</strong></label><br />
+            <select id="mode" name="mode">
+                <option value="auto" {% if mode == "auto" %}selected{% endif %}>auto</option>
+                <option value="rule" {% if mode == "rule" %}selected{% endif %}>rule</option>
+                <option value="llm" {% if mode == "llm" %}selected{% endif %}>llm</option>
+            </select>
+            <br />
+
+            <button type="submit">Extract</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Results</h2>
+
+        {% if error %}
+            <p class="error">Error: {{ error }}</p>
+        {% endif %}
+
+        <p><strong>Count:</strong> {{ count }}</p>
+
+        {% if items %}
+            <ol>
+                {% for item in items %}
+                    <li class="result-item">{{ item }}</li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p class="muted">No action items extracted yet.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
