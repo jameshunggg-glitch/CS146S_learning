@@ -8,3 +8,7 @@ Tomorrow we should probably clean up the login flow, and someone ought to update
 
 # ex3
 Team A have to update RL526 mark down, and Team B write down tutorial. Boss chill every day.
+
+# ex4
+TODO: fix login bug
+- update README

@@ -8,7 +8,7 @@ def run_agent(notes: str, mode: str = "auto"):
             "items": items,
             "requested_mode": "rule",
             "used_mode": "rule",
-            "message": "Rule mode was used as requested.",
+            "message": "Rule-based mode was used as requested.",
         }
 
     elif mode == "llm":
@@ -28,7 +28,7 @@ def run_agent(notes: str, mode: str = "auto"):
                 "items": rule_items,
                 "requested_mode": "auto",
                 "used_mode": "rule",
-                "message": "Auto mode used rule directly.",
+                "message": "Auto mode used Rule-based directly.",
             }
 
         llm_items = extract_action_items_llm(notes)
@@ -36,7 +36,7 @@ def run_agent(notes: str, mode: str = "auto"):
             "items": llm_items,
             "requested_mode": "auto",
             "used_mode": "llm",
-            "message": "Auto mode tried rule first, then fell back to llm.",
+            "message": "Auto mode tried Rule-based first, then fell back to LLM.",
         }
 
     else:

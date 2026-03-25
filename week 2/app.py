@@ -5,9 +5,28 @@ from pydantic import BaseModel
 
 from agent import run_agent
 
+def format_mode_label(mode: str) -> str:
+    labels = {
+        "rule": "Rule-based",
+        "llm": "LLM",
+        "auto": "Auto",
+        "-": "-",
+    }
+    return labels.get(mode, mode)
+
+
+def format_status_label(status: str) -> str:
+    labels = {
+        "idle": "Idle",
+        "success": "Success",
+        "no_items": "No items found",
+        "error": "Error",
+    }
+    return labels.get(status, status)
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
 
 
 class ExtractRequest(BaseModel):
@@ -26,9 +45,12 @@ def home(request: Request):
             "notes": "",
             "mode": "auto",
             "used_mode": "-",
+            "mode_label": "Auto",
+            "used_mode_label": "-",
             "agent_message": "No extraction has been run yet.",
             "count": 0,
             "status": "idle",
+            "status_label": "Idle",
             "error": "",
         },
     )
@@ -52,6 +74,10 @@ def extract_action_items_web(
             status = "success"
         else:
             status = "no_items"
+        
+        mode_label = format_mode_label(requested_mode)
+        used_mode_label = format_mode_label(used_mode)
+        status_label = format_status_label(status)
 
         return templates.TemplateResponse(
             request=request,
@@ -62,9 +88,12 @@ def extract_action_items_web(
                 "notes": notes,
                 "mode": requested_mode,
                 "used_mode": used_mode,
+                "mode_label": mode_label,
+                "used_mode_label": used_mode_label,
                 "agent_message": agent_message,
                 "count": len(items),
                 "status": status,
+                "status_label": status_label,
                 "error": "",
             },
         )
@@ -81,6 +110,7 @@ def extract_action_items_web(
                 "agent_message": "The agent could not complete the extraction.",
                 "count": 0,
                 "status": "error",
+                "status_label": status_label,
                 "error": str(e),
             },
         )
