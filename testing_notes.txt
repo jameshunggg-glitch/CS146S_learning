@@ -1,0 +1,10 @@
+# ex1
+James need to fix the login bug.
+Jonathan also need to buy the hotpot.
+Mom is talking to dad.
+
+# ex2
+Tomorrow we should probably clean up the login flow, and someone ought to update the README when there is time.
+
+# ex3
+Team A have to update RL526 mark down, and Team B write down tutorial. Boss chill every day.

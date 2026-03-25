@@ -18,12 +18,15 @@ class ExtractRequest(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse(
-        "index.html",
-        {
+        request=request,
+        name="index.html",
+        context={
             "request": request,
             "items": [],
             "notes": "",
             "mode": "auto",
+            "used_mode": "-",
+            "agent_message": "No extraction has been run yet.",
             "count": 0,
             "status": "idle",
             "error": "",
@@ -38,7 +41,12 @@ def extract_action_items_web(
     mode: str = Form("auto"),
 ):
     try:
-        items = run_agent(notes, mode=mode)
+        result = run_agent(notes, mode=mode)
+
+        items = result["items"]
+        requested_mode = result["requested_mode"]
+        used_mode = result["used_mode"]
+        agent_message = result["message"]
 
         if len(items) > 0:
             status = "success"
@@ -46,12 +54,15 @@ def extract_action_items_web(
             status = "no_items"
 
         return templates.TemplateResponse(
-            "index.html",
-            {
+            request=request,
+            name="index.html",
+            context={
                 "request": request,
                 "items": items,
                 "notes": notes,
-                "mode": mode,
+                "mode": requested_mode,
+                "used_mode": used_mode,
+                "agent_message": agent_message,
                 "count": len(items),
                 "status": status,
                 "error": "",
@@ -59,12 +70,15 @@ def extract_action_items_web(
         )
     except Exception as e:
         return templates.TemplateResponse(
-            "index.html",
-            {
+            request=request,
+            name="index.html",
+            context={
                 "request": request,
                 "items": [],
                 "notes": notes,
                 "mode": mode,
+                "used_mode": "-",
+                "agent_message": "The agent could not complete the extraction.",
                 "count": 0,
                 "status": "error",
                 "error": str(e),
