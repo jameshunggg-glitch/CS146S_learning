@@ -12,7 +12,7 @@ from week3.tools.weather import get_weather_forecast
 
 # ---------------------------------------------------------
 # Logging
-# STDIO MCP server should log to stderr, not stdout
+# MCP STDIO server should log to stderr, not stdout
 # ---------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
@@ -20,12 +20,13 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
-logger = logging.getLogger("weather-mcp-server")
+logger = logging.getLogger("weather-map-server")
 
 # ---------------------------------------------------------
 # MCP App
 # ---------------------------------------------------------
 mcp = FastMCP("weather-map-server")
+
 
 # ---------------------------------------------------------
 # Tool 1: search_location
