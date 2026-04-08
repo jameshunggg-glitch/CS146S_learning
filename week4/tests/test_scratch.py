@@ -1,13 +1,7 @@
-from app.models import ArticleCandidate, ArticleDigest
+from pathlib import Path
 
-candidate = ArticleCandidate(
-    title="Test News",
-    url="https://example.com",
-    source="BBC",
-    published_date="2026-04-08"
-)
-
-print(candidate)
+from app.models import ArticleDigest
+from app.writer import write_digest_file
 
 digest = ArticleDigest(
     title="Test News",
@@ -19,13 +13,15 @@ digest = ArticleDigest(
     key_points=[
         "Point one",
         "Point two",
-        "Point three",
     ],
     warnings=[
         "Paywall not checked",
     ],
 )
 
-print(digest)
-print(digest.key_points)
-print(digest.warnings)
+write_digest_file(digest, "test_output.md")
+
+print("File written successfully.")
+print("Current working directory:", Path.cwd())
+print("Expected file path:", Path("test_output.md").resolve())
+print("File exists:", Path("test_output.md").exists())
