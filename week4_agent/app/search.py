@@ -8,61 +8,35 @@ Responsibilities:
 
 Implementation note:
     Two-layer design (mirrors fetch.py):
-    - parse_rss(xml_text): pure function, parses Google News RSS XML into
+    - parse_rss(xml_text): pure function, parses Bing News RSS XML into
       a list of article metadata dicts. Testable without network access.
     - search_articles(topic): thin HTTP layer, fetches the RSS feed and
       delegates to parse_rss(). Network calls can be mocked in tests.
 
-    Search source: Google News RSS (free, no API key required).
-    Uses Python standard library only (urllib, xml.etree.ElementTree, html.parser).
+    Search source: Bing News RSS (free, no API key required).
+    Uses Python standard library only (urllib, xml.etree.ElementTree).
 
-    URL extraction strategy:
-    Google News RSS <link> elements are redirect URLs that require JavaScript
-    to resolve to the real article. The real publisher URL is embedded as the
-    href of the first <a> tag inside the <description> HTML fragment.
-    parse_rss() prefers that href; falls back to <link> if not found.
+    URL extraction:
+    Bing News RSS <link> elements are redirect URLs of the form:
+        http://www.bing.com/news/apiclick.aspx?...&url=REAL_URL&...
+    The real publisher URL is extracted from the 'url' query parameter
+    using urllib.parse.parse_qs(). Falls back to the raw <link> value
+    if the parameter is absent.
+
+    Source extraction:
+    Bing News RSS wraps the publisher name in a namespaced element
+    (<News:Source>). The namespace URI varies per query, so source is
+    found by matching the local tag name ('Source') regardless of namespace.
 """
 
-from html.parser import HTMLParser
 import urllib.request
 import urllib.error
 import urllib.parse
 import xml.etree.ElementTree as ET
 
 
-class _FirstHrefParser(HTMLParser):
-    """Find the href of the first <a> tag in an HTML fragment."""
-
-    def __init__(self):
-        super().__init__()
-        self.href = ""
-
-    def handle_starttag(self, tag, attrs):
-        if tag == "a" and not self.href:
-            for name, value in attrs:
-                if name == "href" and value:
-                    self.href = value
-                    break
-
-
-def _extract_url_from_description(description_html: str) -> str:
-    """Return the href of the first <a> tag in description_html, or ''.
-
-    Args:
-        description_html: HTML string from a Google News RSS <description> element.
-
-    Returns:
-        The first href found, or "" if none exists.
-    """
-    if not description_html:
-        return ""
-    parser = _FirstHrefParser()
-    parser.feed(description_html)
-    return parser.href
-
-
 def parse_rss(xml_text: str) -> list[dict]:
-    """Parse Google News RSS XML and return a list of article metadata dicts.
+    """Parse Bing News RSS XML and return a list of article metadata dicts.
 
     Each dict contains: title, url, source, published_date.
     Items missing both title and url are skipped.
@@ -90,16 +64,21 @@ def parse_rss(xml_text: str) -> list[dict]:
     for item in channel.findall("item"):
         title_el = item.find("title")
         link_el = item.find("link")
-        source_el = item.find("source")
         pubdate_el = item.find("pubDate")
-        description_el = item.find("description")
+        # <News:Source> carries a query-dependent namespace; match by local name.
+        source_el = next(
+            (c for c in item if c.tag.split("}")[-1] == "Source"), None
+        )
 
         title = (title_el.text or "").strip() if title_el is not None else ""
         link_url = (link_el.text or "").strip() if link_el is not None else ""
-        description_html = (description_el.text or "") if description_el is not None else ""
-        url = _extract_url_from_description(description_html) or link_url
         source = (source_el.text or "").strip() if source_el is not None else ""
         published_date = (pubdate_el.text or "").strip() or None if pubdate_el is not None else None
+
+        # Extract real publisher URL from Bing redirect's 'url' query parameter.
+        parsed = urllib.parse.urlparse(link_url)
+        params = urllib.parse.parse_qs(parsed.query)
+        url = params.get("url", [""])[0] or link_url
 
         if not (title and url):
             continue
@@ -115,7 +94,7 @@ def parse_rss(xml_text: str) -> list[dict]:
 
 
 def search_articles(topic: str, max_results: int = 5) -> list[dict]:
-    """Search Google News RSS for articles related to topic.
+    """Search Bing News RSS for articles related to topic.
 
     Returns up to max_results article metadata dicts.
     Returns [] on any network or HTTP error (best-effort, not strict).
@@ -129,12 +108,15 @@ def search_articles(topic: str, max_results: int = 5) -> list[dict]:
     """
     query = urllib.parse.quote(topic)
     rss_url = (
-        f"https://news.google.com/rss/search"
-        f"?q={query}&hl=en-US&gl=US&ceid=US:en"
+        f"https://www.bing.com/news/search"
+        f"?q={query}&format=rss&setlang=en-US&cc=US"
     )
 
     try:
-        req = urllib.request.Request(rss_url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request(rss_url, headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept-Language": "en-US,en;q=0.9",
+        })
         with urllib.request.urlopen(req, timeout=10) as response:
             xml_text = response.read().decode("utf-8", errors="replace")
         return parse_rss(xml_text)[:max_results]

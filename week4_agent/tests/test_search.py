@@ -4,10 +4,14 @@ test_search.py — Tests for app/search.py.
 Covers:
 - parse_rss(): pure function tests against RSS XML strings (no network).
 - search_articles(): mock-based tests for the HTTP layer (no real requests).
+
+Fixture format mirrors the real Bing News RSS structure:
+- <link> is a Bing redirect URL with the real article URL in its 'url=' parameter.
+- Publisher name is in a namespaced <News:Source> element.
 """
 
-import html
 import urllib.error
+import urllib.parse
 from unittest.mock import patch, MagicMock
 
 from app.search import parse_rss, search_articles
@@ -17,12 +21,20 @@ from app.search import parse_rss, search_articles
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_rss(items: list[dict]) -> str:
-    """Build a minimal RSS XML string from a list of item dicts.
+def _make_bing_link(real_url: str) -> str:
+    """Build a Bing-style redirect link wrapping the real article URL.
 
-    The 'description' value should be raw HTML (e.g. '<a href="...">Title</a>');
-    it is HTML-escaped before embedding in the XML so the parser receives it
-    as the text content of the <description> element.
+    Mirrors the actual format: http://www.bing.com/news/apiclick.aspx?...&url=ENCODED&...
+    """
+    encoded = urllib.parse.quote(real_url, safe="")
+    return f"http://www.bing.com/news/apiclick.aspx?ref=FexRss&url={encoded}&c=123&mkt=en-us"
+
+
+def _make_rss(items: list[dict]) -> str:
+    """Build a minimal Bing News RSS XML string from a list of item dicts.
+
+    The 'link' value should be a Bing redirect URL (use _make_bing_link()).
+    The 'source' value is emitted as <News:Source> with a fixed test namespace.
     """
     item_blocks = []
     for it in items:
@@ -30,11 +42,11 @@ def _make_rss(items: list[dict]) -> str:
         if "title" in it:
             block += f"<title>{it['title']}</title>"
         if "link" in it:
-            block += f"<link>{it['link']}</link>"
-        if "description" in it:
-            block += f"<description>{html.escape(it['description'])}</description>"
+            # '&' in URLs must be escaped as '&amp;' inside XML text nodes.
+            safe_link = it["link"].replace("&", "&amp;")
+            block += f"<link>{safe_link}</link>"
         if "source" in it:
-            block += f"<source>{it['source']}</source>"
+            block += f"<News:Source>{it['source']}</News:Source>"
         if "pubDate" in it:
             block += f"<pubDate>{it['pubDate']}</pubDate>"
         block += "</item>"
@@ -43,7 +55,8 @@ def _make_rss(items: list[dict]) -> str:
     items_xml = "".join(item_blocks)
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
-        f'<rss version="2.0"><channel>{items_xml}</channel></rss>'
+        '<rss version="2.0" xmlns:News="https://www.bing.com/news">'
+        f"<channel>{items_xml}</channel></rss>"
     )
 
 
@@ -59,15 +72,13 @@ def _make_mock_response(xml: str) -> MagicMock:
 SAMPLE_RSS = _make_rss([
     {
         "title": "AI Breakthrough in 2025",
-        "link": "https://news.google.com/rss/articles/abc123",
-        "description": '<a href="https://techcrunch.com/ai-breakthrough">AI Breakthrough in 2025</a>',
+        "link": _make_bing_link("https://techcrunch.com/ai-breakthrough"),
         "source": "Tech Daily",
         "pubDate": "Thu, 10 Apr 2025 12:00:00 GMT",
     },
     {
         "title": "Open Source Models Compete",
-        "link": "https://news.google.com/rss/articles/def456",
-        "description": '<a href="https://aiweekly.com/open-source">Open Source Models Compete</a>',
+        "link": _make_bing_link("https://aiweekly.com/open-source"),
         "source": "AI Weekly",
         "pubDate": "Fri, 11 Apr 2025 09:00:00 GMT",
     },
@@ -99,7 +110,7 @@ def test_parse_correct_title():
 
 
 def test_parse_correct_url():
-    # URL should be the real publisher URL extracted from <description>, not the redirect.
+    # Real publisher URL is extracted from the Bing redirect's 'url=' parameter.
     assert parse_rss(SAMPLE_RSS)[0]["url"] == "https://techcrunch.com/ai-breakthrough"
 
 
@@ -130,36 +141,25 @@ def test_parse_skips_items_without_title_and_url():
     assert parse_rss(xml) == []
 
 
-def test_parse_url_extracted_from_description():
-    # Real publisher URL should come from <a href> in <description>.
+def test_parse_url_extracted_from_bing_redirect():
+    # Real publisher URL comes from the 'url=' query parameter in the Bing link.
     xml = _make_rss([{
         "title": "Test Article",
-        "link": "https://news.google.com/rss/articles/redirect123",
-        "description": '<a href="https://publisher.com/real-article">Test Article</a>',
+        "link": _make_bing_link("https://publisher.com/real-article"),
         "source": "Publisher",
     }])
     assert parse_rss(xml)[0]["url"] == "https://publisher.com/real-article"
 
 
-def test_parse_url_falls_back_to_link_when_no_description():
-    # Without a <description>, the <link> redirect URL is used as fallback.
+def test_parse_url_falls_back_to_raw_link_when_no_url_param():
+    # A <link> with no 'url=' parameter falls back to the raw link value.
+    raw_link = "https://some-direct-url.com/article"
     xml = _make_rss([{
         "title": "Test Article",
-        "link": "https://news.google.com/rss/articles/redirect123",
+        "link": raw_link,
         "source": "Publisher",
     }])
-    assert parse_rss(xml)[0]["url"] == "https://news.google.com/rss/articles/redirect123"
-
-
-def test_parse_url_falls_back_to_link_when_description_has_no_href():
-    # A <description> with no <a> tag falls back to the <link> URL.
-    xml = _make_rss([{
-        "title": "Test Article",
-        "link": "https://news.google.com/rss/articles/redirect123",
-        "description": "Plain text description with no link.",
-        "source": "Publisher",
-    }])
-    assert parse_rss(xml)[0]["url"] == "https://news.google.com/rss/articles/redirect123"
+    assert parse_rss(xml)[0]["url"] == raw_link
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ def test_search_returns_empty_on_url_error():
 
 def test_search_returns_empty_on_http_error():
     err = urllib.error.HTTPError(
-        url="https://news.google.com/rss/search",
+        url="https://www.bing.com/news/search",
         code=429,
         msg="Too Many Requests",
         hdrs=None,
