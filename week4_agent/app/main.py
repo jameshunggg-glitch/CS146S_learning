@@ -8,12 +8,13 @@ Pipeline (fake-data MVP):
     1. Accept a topic from the command line.
     2. Load a small set of fake articles (stand-in for real search + fetch).
     3. Clean each article's raw text using clean_text().
-    4. Attach a placeholder summary (stand-in for real summarization).
+    4. Generate a short summary with summarize().
     5. Write digest and articles Markdown files to output/.
 """
 
 import argparse
 from app.clean import clean_text
+from app.summarize import summarize
 from app.writer import write_digest, write_articles
 
 
@@ -35,7 +36,6 @@ FAKE_ARTICLES = [
             "Advertisement\n"
             "Researchers noted that model scaling alone no longer explains the improvements.\n"
         ),
-        "summary": "AI reasoning models hit a new milestone in 2025, with gains in multi-step problem solving and scientific benchmarks.",
     },
     {
         "title": "Open Source Models Close the Gap",
@@ -50,7 +50,6 @@ FAKE_ARTICLES = [
             "Community fine-tuning contributed to several unexpected capability jumps.\n"
             "Read more\n"
         ),
-        "summary": "Open source models became competitive with closed alternatives in 2025, driven by community fine-tuning and new releases.",
     },
 ]
 
@@ -75,7 +74,7 @@ def build_articles(topic: str) -> tuple[list[dict], list[dict]]:
             "url": article["url"],
         }
 
-        digest_articles.append({**base, "summary": article["summary"]})
+        digest_articles.append({**base, "summary": summarize(cleaned)})
         full_articles.append({**base, "cleaned_text": cleaned})
 
     return digest_articles, full_articles
