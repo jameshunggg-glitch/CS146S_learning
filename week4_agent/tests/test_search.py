@@ -6,6 +6,7 @@ Covers:
 - search_articles(): mock-based tests for the HTTP layer (no real requests).
 """
 
+import html
 import urllib.error
 from unittest.mock import patch, MagicMock
 
@@ -17,7 +18,12 @@ from app.search import parse_rss, search_articles
 # ---------------------------------------------------------------------------
 
 def _make_rss(items: list[dict]) -> str:
-    """Build a minimal RSS XML string from a list of item dicts."""
+    """Build a minimal RSS XML string from a list of item dicts.
+
+    The 'description' value should be raw HTML (e.g. '<a href="...">Title</a>');
+    it is HTML-escaped before embedding in the XML so the parser receives it
+    as the text content of the <description> element.
+    """
     item_blocks = []
     for it in items:
         block = "<item>"
@@ -25,6 +31,8 @@ def _make_rss(items: list[dict]) -> str:
             block += f"<title>{it['title']}</title>"
         if "link" in it:
             block += f"<link>{it['link']}</link>"
+        if "description" in it:
+            block += f"<description>{html.escape(it['description'])}</description>"
         if "source" in it:
             block += f"<source>{it['source']}</source>"
         if "pubDate" in it:
@@ -52,12 +60,14 @@ SAMPLE_RSS = _make_rss([
     {
         "title": "AI Breakthrough in 2025",
         "link": "https://news.google.com/rss/articles/abc123",
+        "description": '<a href="https://techcrunch.com/ai-breakthrough">AI Breakthrough in 2025</a>',
         "source": "Tech Daily",
         "pubDate": "Thu, 10 Apr 2025 12:00:00 GMT",
     },
     {
         "title": "Open Source Models Compete",
         "link": "https://news.google.com/rss/articles/def456",
+        "description": '<a href="https://aiweekly.com/open-source">Open Source Models Compete</a>',
         "source": "AI Weekly",
         "pubDate": "Fri, 11 Apr 2025 09:00:00 GMT",
     },
@@ -89,7 +99,8 @@ def test_parse_correct_title():
 
 
 def test_parse_correct_url():
-    assert parse_rss(SAMPLE_RSS)[0]["url"] == "https://news.google.com/rss/articles/abc123"
+    # URL should be the real publisher URL extracted from <description>, not the redirect.
+    assert parse_rss(SAMPLE_RSS)[0]["url"] == "https://techcrunch.com/ai-breakthrough"
 
 
 def test_parse_correct_source():
@@ -117,6 +128,38 @@ def test_parse_skips_items_without_title_and_url():
     # An item with only source/pubDate and no title+url should be dropped.
     xml = _make_rss([{"source": "Orphan Source", "pubDate": "Mon, 01 Jan 2025 00:00:00 GMT"}])
     assert parse_rss(xml) == []
+
+
+def test_parse_url_extracted_from_description():
+    # Real publisher URL should come from <a href> in <description>.
+    xml = _make_rss([{
+        "title": "Test Article",
+        "link": "https://news.google.com/rss/articles/redirect123",
+        "description": '<a href="https://publisher.com/real-article">Test Article</a>',
+        "source": "Publisher",
+    }])
+    assert parse_rss(xml)[0]["url"] == "https://publisher.com/real-article"
+
+
+def test_parse_url_falls_back_to_link_when_no_description():
+    # Without a <description>, the <link> redirect URL is used as fallback.
+    xml = _make_rss([{
+        "title": "Test Article",
+        "link": "https://news.google.com/rss/articles/redirect123",
+        "source": "Publisher",
+    }])
+    assert parse_rss(xml)[0]["url"] == "https://news.google.com/rss/articles/redirect123"
+
+
+def test_parse_url_falls_back_to_link_when_description_has_no_href():
+    # A <description> with no <a> tag falls back to the <link> URL.
+    xml = _make_rss([{
+        "title": "Test Article",
+        "link": "https://news.google.com/rss/articles/redirect123",
+        "description": "Plain text description with no link.",
+        "source": "Publisher",
+    }])
+    assert parse_rss(xml)[0]["url"] == "https://news.google.com/rss/articles/redirect123"
 
 
 # ---------------------------------------------------------------------------

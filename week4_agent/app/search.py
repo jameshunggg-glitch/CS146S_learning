@@ -14,14 +14,51 @@ Implementation note:
       delegates to parse_rss(). Network calls can be mocked in tests.
 
     Search source: Google News RSS (free, no API key required).
-    Uses Python standard library only (urllib, xml.etree.ElementTree).
-    Returned URLs are Google News redirect links; fetch.py follows redirects.
+    Uses Python standard library only (urllib, xml.etree.ElementTree, html.parser).
+
+    URL extraction strategy:
+    Google News RSS <link> elements are redirect URLs that require JavaScript
+    to resolve to the real article. The real publisher URL is embedded as the
+    href of the first <a> tag inside the <description> HTML fragment.
+    parse_rss() prefers that href; falls back to <link> if not found.
 """
 
+from html.parser import HTMLParser
 import urllib.request
 import urllib.error
 import urllib.parse
 import xml.etree.ElementTree as ET
+
+
+class _FirstHrefParser(HTMLParser):
+    """Find the href of the first <a> tag in an HTML fragment."""
+
+    def __init__(self):
+        super().__init__()
+        self.href = ""
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a" and not self.href:
+            for name, value in attrs:
+                if name == "href" and value:
+                    self.href = value
+                    break
+
+
+def _extract_url_from_description(description_html: str) -> str:
+    """Return the href of the first <a> tag in description_html, or ''.
+
+    Args:
+        description_html: HTML string from a Google News RSS <description> element.
+
+    Returns:
+        The first href found, or "" if none exists.
+    """
+    if not description_html:
+        return ""
+    parser = _FirstHrefParser()
+    parser.feed(description_html)
+    return parser.href
 
 
 def parse_rss(xml_text: str) -> list[dict]:
@@ -55,9 +92,12 @@ def parse_rss(xml_text: str) -> list[dict]:
         link_el = item.find("link")
         source_el = item.find("source")
         pubdate_el = item.find("pubDate")
+        description_el = item.find("description")
 
         title = (title_el.text or "").strip() if title_el is not None else ""
-        url = (link_el.text or "").strip() if link_el is not None else ""
+        link_url = (link_el.text or "").strip() if link_el is not None else ""
+        description_html = (description_el.text or "") if description_el is not None else ""
+        url = _extract_url_from_description(description_html) or link_url
         source = (source_el.text or "").strip() if source_el is not None else ""
         published_date = (pubdate_el.text or "").strip() or None if pubdate_el is not None else None
 
