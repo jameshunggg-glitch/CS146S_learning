@@ -1,17 +1,19 @@
 """
-test_integration.py — Small integration test using fake article data.
+test_integration.py — Integration tests using fake article data.
 
-Verifies that:
-- Cleaned text can be passed into the writer.
-- Both digest and articles Markdown files are generated successfully.
+Section 1 (TestIntegration): verifies the clean → write pipeline directly,
+using fake data passed to write_digest() / write_articles(). No main.py involved.
 
-No live network calls. All data is fake/hardcoded.
+Section 2 (TestRunPipeline): verifies run_pipeline() error-handling behaviour
+with all external calls mocked (search, fetch, write). No live network calls.
 """
 
 import os
+from unittest.mock import patch
 import pytest
 from app.clean import clean_text
 from app.writer import write_digest, write_articles
+from app.main import run_pipeline
 
 
 FAKE_RAW_ARTICLES = [
@@ -108,3 +110,72 @@ class TestIntegration:
             content = open(path, encoding="utf-8").read()
             assert "AI Reasoning Models Reach New Milestone" in content
             assert "Open Source Models Close the Gap" in content
+
+
+# ---------------------------------------------------------------------------
+# Section 2: run_pipeline() — mock-based tests for the real pipeline
+# ---------------------------------------------------------------------------
+
+# Shared fake search result used across several tests.
+_FAKE_META = [
+    {
+        "title": "AI Reasoning Hits Milestone",
+        "url": "https://example.com/article-1",
+        "source": "Tech Daily",
+        "published_date": "2025-04-10",
+    },
+    {
+        "title": "Open Source Models Compete",
+        "url": "https://example.com/article-2",
+        "source": "AI Weekly",
+        "published_date": "2025-04-11",
+    },
+]
+
+_FAKE_HTML = (
+    "AI reasoning systems made significant strides in early 2025.\n"
+    "Several leading labs reported improvements in multi-step problem solving.\n"
+    "The gains were most visible in mathematical and scientific benchmarks."
+)
+
+
+class TestRunPipeline:
+
+    def test_returns_0_when_pipeline_succeeds(self, tmp_path):
+        with patch("app.main.search_articles", return_value=_FAKE_META), \
+             patch("app.main.fetch_article", return_value=_FAKE_HTML), \
+             patch("app.main.write_digest", return_value=str(tmp_path / "digest.md")), \
+             patch("app.main.write_articles", return_value=str(tmp_path / "articles.md")):
+            assert run_pipeline("AI") == 0
+
+    def test_returns_1_when_search_finds_nothing(self):
+        with patch("app.main.search_articles", return_value=[]):
+            assert run_pipeline("xyzzy") == 1
+
+    def test_returns_1_when_all_fetches_fail(self):
+        with patch("app.main.search_articles", return_value=_FAKE_META), \
+             patch("app.main.fetch_article", return_value=""):
+            assert run_pipeline("AI") == 1
+
+    def test_skips_failed_fetch_keeps_successful_articles(self, tmp_path):
+        # First article fetch fails, second succeeds — pipeline should still write.
+        fetch_results = ["", _FAKE_HTML]
+        with patch("app.main.search_articles", return_value=_FAKE_META), \
+             patch("app.main.fetch_article", side_effect=fetch_results), \
+             patch("app.main.write_digest", return_value=str(tmp_path / "digest.md")) as mock_digest, \
+             patch("app.main.write_articles", return_value=str(tmp_path / "articles.md")):
+            result = run_pipeline("AI")
+        assert result == 0
+        # write_digest should have been called with exactly 1 article.
+        called_articles = mock_digest.call_args[0][1]
+        assert len(called_articles) == 1
+        assert called_articles[0]["title"] == "Open Source Models Compete"
+
+    def test_write_not_called_when_no_usable_articles(self):
+        with patch("app.main.search_articles", return_value=_FAKE_META), \
+             patch("app.main.fetch_article", return_value=""), \
+             patch("app.main.write_digest") as mock_digest, \
+             patch("app.main.write_articles") as mock_articles:
+            run_pipeline("AI")
+        mock_digest.assert_not_called()
+        mock_articles.assert_not_called()

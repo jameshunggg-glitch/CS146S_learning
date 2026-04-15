@@ -2,82 +2,90 @@
 main.py — CLI entry point for the AI News Digest tool.
 
 Usage:
-    python main.py --topic "AI"
+    python -m app.main --topic "AI"
 
-Pipeline (fake-data MVP):
+Real pipeline:
     1. Accept a topic from the command line.
-    2. Load a small set of fake articles (stand-in for real search + fetch).
-    3. Clean each article's raw text using clean_text().
-    4. Generate a short summary with summarize().
-    5. Write digest and articles Markdown files to output/.
+    2. Search for articles with search_articles(topic).
+    3. Fetch each article's content with fetch_article(url).
+    4. Clean the raw text with clean_text().
+    5. Generate a short summary with summarize().
+    6. Write digest and articles Markdown files to output/.
+
+Failure handling:
+    - No search results → print message and exit.
+    - Individual fetch failure or empty content → skip that article.
+    - All articles unusable after fetching → print message and exit without
+      writing empty files.
 """
 
 import argparse
+import sys
+
+from app.search import search_articles
+from app.fetch import fetch_article
 from app.clean import clean_text
 from app.summarize import summarize
 from app.writer import write_digest, write_articles
 
 
-# ---------------------------------------------------------------------------
-# Fake article data — replaces real search + fetch for the MVP
-# ---------------------------------------------------------------------------
+def run_pipeline(topic: str) -> int:
+    """Run the full search → fetch → clean → summarize → write pipeline.
 
-FAKE_ARTICLES = [
-    {
-        "title": "AI Reasoning Models Reach New Milestone",
-        "source": "Tech News Daily",
-        "published_date": "2025-04-10",
-        "url": "https://example.com/ai-reasoning-milestone",
-        "raw_text": (
-            "AI reasoning systems made significant strides in early 2025.\n"
-            "Several leading labs reported improvements in multi-step problem solving.\n"
-            "Continue reading\n"
-            "The gains were most visible in mathematical and scientific benchmarks.\n"
-            "Advertisement\n"
-            "Researchers noted that model scaling alone no longer explains the improvements.\n"
-        ),
-    },
-    {
-        "title": "Open Source Models Close the Gap",
-        "source": "Open AI Weekly",
-        "published_date": "2025-04-11",
-        "url": "https://example.com/open-source-gap",
-        "raw_text": (
-            "A wave of open source model releases in early 2025 surprised the industry.\n"
-            "Subscribe\n"
-            "Performance on standard benchmarks narrowed the gap with proprietary alternatives.\n"
-            "Sign up\n"
-            "Community fine-tuning contributed to several unexpected capability jumps.\n"
-            "Read more\n"
-        ),
-    },
-]
-
-
-def build_articles(topic: str) -> tuple[list[dict], list[dict]]:
-    """Clean raw text and prepare two article lists for the writer.
-
-    Returns:
-        digest_articles: list of dicts with title, source, published_date, url, summary.
-        full_articles:   list of dicts with title, source, published_date, url, cleaned_text.
+    Returns 0 on success, 1 if nothing could be written.
+    Separated from main() to make the pipeline logic testable without
+    sys.exit or argparse.
     """
+    print(f"Topic: {topic}")
+
+    # --- Search ---
+    articles_meta = search_articles(topic)
+    if not articles_meta:
+        print("No articles found. Try a different topic.")
+        return 1
+
+    print(f"Found {len(articles_meta)} article(s). Fetching content...")
+
+    # --- Fetch / clean / summarize ---
     digest_articles = []
     full_articles = []
 
-    for article in FAKE_ARTICLES:
-        cleaned = clean_text(article["raw_text"])
+    for meta in articles_meta:
+        url = meta["url"]
+        raw_text = fetch_article(url)
+
+        if not raw_text:
+            print(f"  Skip (fetch failed):  {meta['title']}")
+            continue
+
+        cleaned = clean_text(raw_text)
+        if not cleaned:
+            print(f"  Skip (empty content): {meta['title']}")
+            continue
+
+        summary = summarize(cleaned)
 
         base = {
-            "title": article["title"],
-            "source": article["source"],
-            "published_date": article["published_date"],
-            "url": article["url"],
+            "title": meta["title"],
+            "source": meta["source"],
+            "published_date": meta["published_date"],
+            "url": url,
         }
-
-        digest_articles.append({**base, "summary": summarize(cleaned)})
+        digest_articles.append({**base, "summary": summary})
         full_articles.append({**base, "cleaned_text": cleaned})
+        print(f"  OK: {meta['title']}")
 
-    return digest_articles, full_articles
+    # --- Write ---
+    if not digest_articles:
+        print("No usable articles after fetching. Nothing written.")
+        return 1
+
+    digest_path = write_digest(topic, digest_articles)
+    articles_path = write_articles(topic, full_articles)
+
+    print(f"Digest:   {digest_path}")
+    print(f"Articles: {articles_path}")
+    return 0
 
 
 def main():
@@ -85,17 +93,7 @@ def main():
     parser.add_argument("--topic", required=True, help="Topic to search for")
     args = parser.parse_args()
 
-    topic = args.topic
-    print(f"Topic: {topic}")
-    print(f"Articles: {len(FAKE_ARTICLES)} (fake data)")
-
-    digest_articles, full_articles = build_articles(topic)
-
-    digest_path = write_digest(topic, digest_articles)
-    articles_path = write_articles(topic, full_articles)
-
-    print(f"Digest:   {digest_path}")
-    print(f"Articles: {articles_path}")
+    sys.exit(run_pipeline(args.topic))
 
 
 if __name__ == "__main__":
