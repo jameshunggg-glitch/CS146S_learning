@@ -3,9 +3,9 @@
 ## Current Status
 MVP is complete. All six modules are implemented and the real pipeline is fully wired.
 Running `python -m app.main --topic "AI"` executes the full search → fetch → clean → summarize → write flow using real network calls.
-88 tests passing; no remaining stubs.
+87 tests passing; no remaining stubs.
 
-Bug fixed: `parse_rss()` in `search.py` now extracts the real publisher article URL from the `<description>` HTML fragment instead of using the Google News JavaScript redirect URL from `<link>`. This resolves an issue where every article's Content was "Google News" and Summary was empty.
+Bug fixed (two-stage): search source switched from Google News RSS to Bing News RSS. Google News redirect URLs require JavaScript to resolve and the interstitial HTML contains no extractable publisher URL. Bing News RSS embeds the real article URL as a `url=` query parameter in each `<link>` element, which `parse_rss()` extracts via `urllib.parse.parse_qs()`. This resolves the issue where every article's Content was "Google News" and Summary was empty.
 
 ---
 
@@ -22,8 +22,8 @@ Bug fixed: `parse_rss()` in `search.py` now extracts the real publisher article 
 - `tests/test_summarize.py` — 11 passing tests covering normal text, sentence limit, short-line filtering, and edge cases
 - `app/fetch.py` — implemented as two layers: `extract_text(html)` pure function strips HTML tags using `html.parser`; `fetch_article(url)` thin urllib HTTP layer with User-Agent header, delegates to `extract_text()`, returns "" on any error
 - `tests/test_fetch.py` — 16 passing tests: 10 pure-function tests for `extract_text()`, 6 mock-based tests for `fetch_article()` including User-Agent header assertion; no live network calls
-- `app/search.py` — implemented as two layers: `parse_rss(xml_text)` pure function parses Google News RSS XML using `xml.etree.ElementTree`; `search_articles(topic)` thin urllib HTTP layer fetches RSS and delegates to `parse_rss()`, returns [] on any error. Bug fix: real publisher URL is now extracted from RSS `<description>` `<a href>`, with fallback to `<link>` redirect URL.
-- `tests/test_search.py` — 19 passing tests: 14 pure-function tests for `parse_rss()` (including 3 new URL-extraction/fallback tests), 5 mock-based tests for `search_articles()`; no live network calls
+- `app/search.py` — implemented as two layers: `parse_rss(xml_text)` pure function parses Bing News RSS XML using `xml.etree.ElementTree`; `search_articles(topic)` thin urllib HTTP layer fetches RSS and delegates to `parse_rss()`, returns [] on any error. Real publisher URL extracted from Bing redirect's `url=` query parameter via `urllib.parse.parse_qs()`; source found namespace-agnostically from `<News:Source>`.
+- `tests/test_search.py` — 18 passing tests: 13 pure-function tests for `parse_rss()` (including Bing URL extraction and fallback tests), 5 mock-based tests for `search_articles()`; no live network calls; fixtures mirror real Bing RSS structure
 - `app/main.py` — real pipeline wired: `search_articles()` → `fetch_article()` → `clean_text()` → `summarize()` → writer; per-article fetch failures are skipped gracefully; empty search or all-fail exits with a clear message without writing files
 - `tests/test_integration.py` — extended to 11 tests: original 6 clean→write tests plus 5 mock-based `run_pipeline()` tests covering success, empty search, all-fetch-fail, partial-fetch-fail, and no-write-on-failure
 - `.gitignore` — excludes `__pycache__/`, `.claude/`, and generated `output/*.md`
@@ -40,7 +40,7 @@ Bug fixed: `parse_rss()` in `search.py` now extracts the real publisher article 
 | `tests/test_integration.py` | Done — 11 passing tests (clean→write pipeline + run_pipeline mock tests) |
 | `app/summarize.py` | Done — extractive summarizer, 11 tests passing |
 | `app/fetch.py` | Done — two-layer implementation with User-Agent header, 16 tests passing |
-| `app/search.py` | Done — two-layer implementation, URL bug fixed, 19 tests passing |
+| `app/search.py` | Done — Bing News RSS, URL from redirect param, 18 tests passing |
 
 ---
 
