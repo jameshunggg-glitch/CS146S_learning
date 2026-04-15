@@ -1,8 +1,9 @@
 # week4_agent — Progress Notes
 
 ## Current Status
-MVP scaffold is in place. One module (`clean.py`) is fully implemented and tested.
-All other modules are stubs with docstrings and `raise NotImplementedError`.
+Two modules are fully implemented and tested: `clean.py` and `writer.py`.
+Remaining modules (`search.py`, `fetch.py`, `summarize.py`) are stubs.
+The pipeline in `main.py` is not yet connected end-to-end.
 
 ---
 
@@ -11,6 +12,8 @@ All other modules are stubs with docstrings and `raise NotImplementedError`.
 - `CLAUDE.md` and `PROJECT_BRIEF.md` define scope and working rules
 - `app/clean.py` — fully implemented: noise phrase removal, pure-punctuation line removal, excessive blank-line collapsing
 - `tests/test_clean.py` — 11 passing tests covering all cleaning rules and false-positive guards
+- `app/writer.py` — fully implemented: `write_digest()` and `write_articles()` write Markdown files to `output/`
+- `tests/test_writer.py` — 20 passing tests covering file creation, filename format, content presence, and edge cases
 - `.gitignore` — excludes `__pycache__/`, `.claude/`, and generated `output/*.md`
 
 ---
@@ -20,24 +23,25 @@ All other modules are stubs with docstrings and `raise NotImplementedError`.
 | File | Status |
 |---|---|
 | `app/clean.py` | Done — real implementation, 11 tests passing |
+| `app/writer.py` | Done — real implementation, 20 tests passing |
 | `app/main.py` | Stub — CLI entry point, `--topic` arg wired, pipeline not connected |
 | `app/search.py` | Stub — `search_articles()` signature only |
 | `app/fetch.py` | Stub — `fetch_article()` signature only |
 | `app/summarize.py` | Stub — `summarize()` signature only |
-| `app/writer.py` | Stub — `write_digest()` and `write_articles()` signatures only |
-| `tests/test_writer.py` | Placeholder — no tests yet |
 | `tests/test_integration.py` | Placeholder — no tests yet |
 
 ---
 
 ## Next Recommended Step
-Implement `app/writer.py` — it has no external dependencies and its tests can be written immediately alongside it. Once `write_digest` and `write_articles` are real, `test_writer.py` and `test_integration.py` can be filled in using fake article data.
+Implement `app/fetch.py` — fetches article content from a URL. It is a self-contained module with one clear responsibility and no dependency on unfinished modules. Once fetch is real, `search.py` and `summarize.py` can follow, and `main.py` can be wired up.
+
+Alternatively, implement `app/summarize.py` first if API access is ready — it also has no dependency on search or fetch.
 
 ---
 
 ## Notes for a New Session
 - Read `CLAUDE.md` and `PROJECT_BRIEF.md` before making any changes.
-- Run tests with: `python -m pytest tests/test_clean.py -v` from `week4_agent/`.
+- Run all current tests with: `python -m pytest tests/test_clean.py tests/test_writer.py -v` from `week4_agent/`.
 - The repo root is one level up: `/CS146S/`, remote is `CS146S_learning` on GitHub.
 - Do not add new dependencies or expand scope beyond the MVP defined in `PROJECT_BRIEF.md`.
 - The article dict shape used across modules: `title`, `url`, `source`, `published_date`, `cleaned_text`, `summary`.

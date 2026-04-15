@@ -28,8 +28,42 @@ def write_digest(topic: str, articles: list[dict], output_dir: str = "output") -
     Returns:
         Path of the written file.
     """
-    # TODO: implement Markdown digest generation
-    raise NotImplementedError
+    today = date.today().isoformat()
+    filename = f"{topic}_{today}_digest.md"
+    filepath = os.path.join(output_dir, filename)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    lines = [
+        f"# News Digest: {topic}",
+        f"",
+        f"**Generated:** {today}  ",
+        f"**Articles:** {len(articles)}",
+        f"",
+        f"---",
+        f"",
+    ]
+
+    for article in articles:
+        lines += [
+            f"## {article.get('title', 'Untitled')}",
+            f"",
+            f"**Source:** {article.get('source', 'Unknown')}  ",
+            f"**Date:** {article.get('published_date', 'Unknown')}  ",
+            f"**Link:** {article.get('url', '')}",
+            f"",
+            f"### Summary",
+            f"",
+            f"{article.get('summary', '')}",
+            f"",
+            f"---",
+            f"",
+        ]
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    return filepath
 
 
 def write_articles(topic: str, articles: list[dict], output_dir: str = "output") -> str:
@@ -46,5 +80,39 @@ def write_articles(topic: str, articles: list[dict], output_dir: str = "output")
     Returns:
         Path of the written file.
     """
-    # TODO: implement Markdown articles file generation
-    raise NotImplementedError
+    today = date.today().isoformat()
+    filename = f"{topic}_{today}_articles.md"
+    filepath = os.path.join(output_dir, filename)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    lines = [
+        f"# Articles: {topic}",
+        f"",
+        f"**Generated:** {today}  ",
+        f"**Articles:** {len(articles)}",
+        f"",
+        f"---",
+        f"",
+    ]
+
+    for article in articles:
+        lines += [
+            f"## {article.get('title', 'Untitled')}",
+            f"",
+            f"**Source:** {article.get('source', 'Unknown')}  ",
+            f"**Date:** {article.get('published_date', 'Unknown')}  ",
+            f"**Link:** {article.get('url', '')}",
+            f"",
+            f"### Content",
+            f"",
+            f"{article.get('cleaned_text', '')}",
+            f"",
+            f"---",
+            f"",
+        ]
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    return filepath

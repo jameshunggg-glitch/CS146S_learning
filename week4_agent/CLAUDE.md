@@ -28,6 +28,12 @@ Use `PROJECT_BRIEF.md` as the main source of truth for:
 - initial testing direction,
 - repository structure.
 
+Use `week4_agent_progress.md` for:
+- current project status,
+- what has already been implemented,
+- what is still placeholder/stub,
+- the next recommended step for the next session.
+
 Do not assume extra features beyond the current MVP unless the user explicitly asks for them.
 
 If the current code and the brief conflict, prefer conservative changes and explain the mismatch.
