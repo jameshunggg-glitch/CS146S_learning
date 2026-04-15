@@ -83,7 +83,8 @@ def fetch_article(url: str) -> str:
         Plain text extracted from the page, or "" on failure.
     """
     try:
-        with urllib.request.urlopen(url, timeout=10) as response:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as response:
             raw_bytes = response.read()
             encoding = response.headers.get_content_charset() or "utf-8"
             html = raw_bytes.decode(encoding, errors="replace")

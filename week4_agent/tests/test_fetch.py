@@ -141,3 +141,13 @@ def test_fetch_returns_empty_on_http_error():
     with patch("urllib.request.urlopen", side_effect=err):
         result = fetch_article("https://example.com/article")
     assert result == ""
+
+
+def test_fetch_sends_user_agent_header():
+    # Confirm that fetch_article() includes a User-Agent header in the request,
+    # so real websites don't reject it as a bare urllib call.
+    html = "<p>Content.</p>"
+    with patch("urllib.request.urlopen", return_value=_make_mock_response(html)) as mock_open:
+        fetch_article("https://example.com/article")
+    request_arg = mock_open.call_args[0][0]
+    assert request_arg.get_header("User-agent") == "Mozilla/5.0"
