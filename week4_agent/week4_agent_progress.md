@@ -3,7 +3,9 @@
 ## Current Status
 MVP is complete. All six modules are implemented and the real pipeline is fully wired.
 Running `python -m app.main --topic "AI"` executes the full search → fetch → clean → summarize → write flow using real network calls.
-85 tests passing; no remaining stubs. Minor stability patch applied: `fetch_article()` now sends a User-Agent header consistent with `search_articles()`.
+88 tests passing; no remaining stubs.
+
+Bug fixed: `parse_rss()` in `search.py` now extracts the real publisher article URL from the `<description>` HTML fragment instead of using the Google News JavaScript redirect URL from `<link>`. This resolves an issue where every article's Content was "Google News" and Summary was empty.
 
 ---
 
@@ -20,8 +22,8 @@ Running `python -m app.main --topic "AI"` executes the full search → fetch →
 - `tests/test_summarize.py` — 11 passing tests covering normal text, sentence limit, short-line filtering, and edge cases
 - `app/fetch.py` — implemented as two layers: `extract_text(html)` pure function strips HTML tags using `html.parser`; `fetch_article(url)` thin urllib HTTP layer with User-Agent header, delegates to `extract_text()`, returns "" on any error
 - `tests/test_fetch.py` — 16 passing tests: 10 pure-function tests for `extract_text()`, 6 mock-based tests for `fetch_article()` including User-Agent header assertion; no live network calls
-- `app/search.py` — implemented as two layers: `parse_rss(xml_text)` pure function parses Google News RSS XML using `xml.etree.ElementTree`; `search_articles(topic)` thin urllib HTTP layer fetches RSS and delegates to `parse_rss()`, returns [] on any error
-- `tests/test_search.py` — 16 passing tests: 11 pure-function tests for `parse_rss()`, 5 mock-based tests for `search_articles()`; no live network calls; search source is Google News RSS (no API key required)
+- `app/search.py` — implemented as two layers: `parse_rss(xml_text)` pure function parses Google News RSS XML using `xml.etree.ElementTree`; `search_articles(topic)` thin urllib HTTP layer fetches RSS and delegates to `parse_rss()`, returns [] on any error. Bug fix: real publisher URL is now extracted from RSS `<description>` `<a href>`, with fallback to `<link>` redirect URL.
+- `tests/test_search.py` — 19 passing tests: 14 pure-function tests for `parse_rss()` (including 3 new URL-extraction/fallback tests), 5 mock-based tests for `search_articles()`; no live network calls
 - `app/main.py` — real pipeline wired: `search_articles()` → `fetch_article()` → `clean_text()` → `summarize()` → writer; per-article fetch failures are skipped gracefully; empty search or all-fail exits with a clear message without writing files
 - `tests/test_integration.py` — extended to 11 tests: original 6 clean→write tests plus 5 mock-based `run_pipeline()` tests covering success, empty search, all-fetch-fail, partial-fetch-fail, and no-write-on-failure
 - `.gitignore` — excludes `__pycache__/`, `.claude/`, and generated `output/*.md`
@@ -38,7 +40,7 @@ Running `python -m app.main --topic "AI"` executes the full search → fetch →
 | `tests/test_integration.py` | Done — 11 passing tests (clean→write pipeline + run_pipeline mock tests) |
 | `app/summarize.py` | Done — extractive summarizer, 11 tests passing |
 | `app/fetch.py` | Done — two-layer implementation with User-Agent header, 16 tests passing |
-| `app/search.py` | Done — two-layer implementation, 16 tests passing |
+| `app/search.py` | Done — two-layer implementation, URL bug fixed, 19 tests passing |
 
 ---
 
