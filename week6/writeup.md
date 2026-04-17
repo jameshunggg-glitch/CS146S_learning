@@ -99,16 +99,34 @@ e. Why this mitigates the issue
 
 ## Fix #3
 a. File and line(s)
-> TODO
+> `backend/app/routers/notes.py`, lines 102–105 (function `debug_eval`)
 
 b. Rule/category Semgrep flagged
-> TODO
+> `python.lang.security.audit.eval-detected.eval-detected`
 
 c. Brief risk description
-> TODO
+> `eval()` executed arbitrary user-supplied Python expressions directly on the server.
+> An attacker could pass payloads like `__import__('os').system('id')` to achieve
+> remote code execution (RCE) with the privileges of the web process.
 
 d. Your change (short code diff or explanation, AI coding tool usage)
-> TODO
+> Replaced `eval()` with `ast.literal_eval()` from the standard library.
+>
+> ```diff
+> - result = str(eval(expr))  # noqa: S307
+> + import ast
+> + result = str(ast.literal_eval(expr))
+> ```
 
 e. Why this mitigates the issue
-> TODO
+> `ast.literal_eval` only parses Python literal structures (numbers, strings, lists,
+> dicts, booleans, None). It cannot import modules, call functions, or execute statements.
+> Any non-literal input raises a `ValueError`, terminating the request safely.
+> Semgrep re-scan confirms `eval-detected` finding is cleared.
+>
+> **Behavior tradeoff:** Arithmetic expressions like `1+2` no longer evaluate — only
+> literals like `42`, `"hello"`, `[1,2,3]` are accepted. This is the intended tradeoff
+> for a debug endpoint in a security remediation context.
+>
+> **Verification caveat:** Runtime verification remains deferred due to the same
+> pre-existing environment issues noted in Findings 1 and 2.

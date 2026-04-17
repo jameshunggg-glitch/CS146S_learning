@@ -101,7 +101,8 @@ def debug_hash_md5(q: str) -> dict[str, str]:
 
 @router.get("/debug/eval")
 def debug_eval(expr: str) -> dict[str, str]:
-    result = str(eval(expr))  # noqa: S307
+    import ast
+    result = str(ast.literal_eval(expr))
     return {"result": result}
 
 
