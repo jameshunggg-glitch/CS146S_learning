@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -18,14 +17,6 @@ Path("data").mkdir(parents=True, exist_ok=True)
 # Mount static frontend
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Compatibility with FastAPI lifespan events; keep on_event for simplicity here
 @app.on_event("startup")
